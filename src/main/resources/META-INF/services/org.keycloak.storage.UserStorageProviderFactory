@@ -1,1 +1,1 @@
-org.keycloak.quickstart.storage.user.FlexUserStorageProviderFactory
+com.ksa.KsaUserStorageProviderFactory
