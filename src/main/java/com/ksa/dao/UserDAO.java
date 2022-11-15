@@ -1,15 +1,19 @@
 package com.ksa.dao;
 
 
+import com.ksa.entity.KsaCustomerCredentialEntity;
 import com.ksa.entity.KsaCustomerEntity;
 import com.ksa.model.UserDto;
 import com.ksa.utils.ConvertUtils;
 import lombok.extern.jbosslog.JBossLog;
 
 import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
 import javax.persistence.Query;
 import javax.persistence.TypedQuery;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -54,9 +58,17 @@ public class UserDAO {
         sql.append("      and KCC.ACTIVE = 1 and KCC.PASSWORD='").append(challengeResponse).append("'  and ROWNUM = 1 ");
 
 
+        log.info("query: " + sql);
         Query nativeQuery = entityManager.createNativeQuery(sql.toString());
-        int maxResults = nativeQuery.getMaxResults();
-        return maxResults > 0;
+        try {
+            Object singleResult = nativeQuery.getSingleResult();
+            log.info("singleResult: " + singleResult);
+            return singleResult != null;
+        } catch (NoResultException e) {
+            log.error(e);
+            return false;
+        }
+
     }
 
     public static void main(String[] args) {
@@ -75,7 +87,7 @@ public class UserDAO {
 
     }
 
-    public void updateIsReset(String customerCode){
+    public void updateIsReset(String customerCode) {
         Query nativeQuery = entityManager.createNativeQuery("update KSA_CUSTOMER_CREDENTIALS set IS_RESET = 0 WHERE CUSTOMER_CODE = '" + customerCode + "' ");
         int i = nativeQuery.executeUpdate();
     }
@@ -83,7 +95,7 @@ public class UserDAO {
     public List<UserDto> findAll() {
         TypedQuery<KsaCustomerEntity> query = entityManager.createQuery("SELECT KC FROM KsaCustomerEntity KC WHERE KC.status = 1", KsaCustomerEntity.class);
         List<KsaCustomerEntity> resultList = query.getResultList();
-        if(resultList == null || resultList.isEmpty())
+        if (resultList == null || resultList.isEmpty())
             return new ArrayList<>();
         return resultList.stream().map(ConvertUtils::convertKsaCustomerEntityToUserDto).collect(Collectors.toList());
     }
@@ -94,22 +106,25 @@ public class UserDAO {
 
     public Optional<UserDto> getUserById(String id) {
         log.info("getUserById: " + id);
-        TypedQuery<KsaCustomerEntity> query = entityManager.createQuery("SELECT KC FROM KsaCustomerEntity KC WHERE KC.id = :id", KsaCustomerEntity.class);
-        query.setParameter("id",id);
-        KsaCustomerEntity singleResult = query.getSingleResult();
-        return Optional.ofNullable(ConvertUtils.convertKsaCustomerEntityToUserDto(singleResult));
+        Query query = entityManager.createQuery("SELECT KC, KCC FROM KsaCustomerEntity KC inner join KsaCustomerCredentialEntity KCC on KC.customerCode = KCC.customerCode WHERE KC.id = :id");
+        query.setParameter("id", id);
+        Object[] resultList = (Object[]) query.getSingleResult();
+        return getUserDtoFromResultList(resultList);
     }
 
     public List<UserDto> searchForUserByUsernameOrEmail(String search) {
         log.info("searchForUserByUsernameOrEmail: " + search);
-        TypedQuery<KsaCustomerEntity> query = entityManager.createQuery("SELECT KC FROM KsaCustomerEntity KC WHERE KC.email = :email or KC.customerCode = :customerCode ", KsaCustomerEntity.class);
+        Query query = entityManager.createQuery("SELECT KC, KCC FROM KsaCustomerEntity KC inner join KsaCustomerCredentialEntity KCC on KC.customerCode = KCC.customerCode WHERE KC.email = :email or KC.customerCode = :customerCode ");
+        query.setParameter("email", search);
+        query.setParameter("customerCode", search);
 
-        query.setParameter("email",search);
-        query.setParameter("customerCode",search);
-        List<KsaCustomerEntity> resultList = query.getResultList();
-        if(resultList == null || resultList.isEmpty())
-            return new ArrayList<>();
-        return resultList.stream().map(ConvertUtils::convertKsaCustomerEntityToUserDto).collect(Collectors.toList());
+        List resultList = query.getResultList();
+        List<UserDto> userDtos = new ArrayList<>();
+        for (Object o : resultList) {
+            Optional<UserDto> userDtoFromResultList = getUserDtoFromResultList((Object[]) o);
+            userDtos.add(userDtoFromResultList.get());
+        }
+        return userDtos;
     }
 
     public Optional<UserDto> getUserByUsername(String username) {
@@ -118,35 +133,39 @@ public class UserDAO {
         Matcher matcherMobile = PATTERN_MOBILE.matcher(username);
         Matcher matcherCustomerCode = PATTERN_CUSTOMER_CODE.matcher(username);
         Matcher matcherEmail = PATTERN_EMAIL.matcher(username);
-        StringBuilder sql = new StringBuilder("SELECT KC FROM KsaCustomerEntity KC WHERE KU.C_STATUS = 1 ");
+        StringBuilder sql = new StringBuilder("SELECT KC, KCC FROM KsaCustomerEntity KC inner join KsaCustomerCredentialEntity KCC on KC.customerCode = KCC.customerCode WHERE KC.status = 1 and KCC.active = 1 ");
         if (matcherMobile.find())
-            sql.append("    and KU.mobile = :username ");
+            sql.append("    and KC.mobile = :username ");
         else if (matcherCustomerCode.find()) {
-            sql.append("    and KU.customerCode = :username ");
+            sql.append("    and KC.customerCode = :username ");
         } else if (matcherEmail.find()) {
-            sql.append("    and KU.email = :username ");
+            sql.append("    and KC.email = :username ");
         }
-        TypedQuery<KsaCustomerEntity> query = entityManager.createQuery(sql.toString(), KsaCustomerEntity.class);
+        Query query = entityManager.createQuery(sql.toString());
+
         query.setParameter("username", username);
         try {
-            KsaCustomerEntity singleResult = query.getSingleResult();
-            return Optional.of(ConvertUtils.convertKsaCustomerEntityToUserDto(singleResult));
-        }catch (Exception ex){
+            Object[] singleResult = (Object[]) query.getSingleResult();
+            return getUserDtoFromResultList(singleResult);
+        } catch (Exception ex) {
+            ex.printStackTrace();
             return Optional.empty();
         }
     }
 
+    private Optional<UserDto> getUserDtoFromResultList(Object[] resultList) {
+        KsaCustomerEntity ksaCustomerEntity = (KsaCustomerEntity) resultList[0];
+        KsaCustomerCredentialEntity ksaCustomerCredentialEntity = (KsaCustomerCredentialEntity) resultList[1];
+
+        UserDto userDto = ConvertUtils.convertKsaCustomerEntityToUserDto(ksaCustomerEntity);
+        if(userDto!= null) {
+            userDto.setIsReset(ksaCustomerCredentialEntity.getIsReset());
+        }
+        return Optional.of(userDto);
+    }
+
     public Optional<UserDto> getUserByEmail(String email) {
         log.info("getUserByEmail: " + email);
-
-        StringBuilder sql = new StringBuilder("SELECT KC FROM KsaCustomerEntity KC WHERE KU.C_STATUS = 1 KC.email = :email ");
-        TypedQuery<KsaCustomerEntity> query = entityManager.createQuery(sql.toString(), KsaCustomerEntity.class);
-        query.setParameter("email", email);
-        try {
-            KsaCustomerEntity singleResult = query.getSingleResult();
-            return Optional.of(ConvertUtils.convertKsaCustomerEntityToUserDto(singleResult));
-        }catch (Exception ex){
-            return Optional.empty();
-        }
+        return getUserByUsername(email);
     }
 }

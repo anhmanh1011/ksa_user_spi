@@ -42,7 +42,7 @@ public class KsaUserStorageProvider implements UserStorageProvider,
     KsaUserStorageProvider(KeycloakSession session, ComponentModel model) {
         this.session = session;
         this.model = model;
-        em = session.getProvider(JpaConnectionProvider.class, "ksa-user-store").getEntityManager();
+        em = session.getProvider(JpaConnectionProvider.class, "ksa-store").getEntityManager();
         userDAO = new UserDAO(em);
     }
 
@@ -121,17 +121,26 @@ public class KsaUserStorageProvider implements UserStorageProvider,
 
     @Override
     public List<UserModel> searchForUser(String search, RealmModel realm, int firstResult, int maxResults) {
-        return new ArrayList<>();
+        log.info("searchForUser(String search, RealmModel realm, int firstResult, int maxResults)");
+        return userDAO.searchForUserByUsernameOrEmail(search)
+                .stream()
+                .map(user -> getUserRepresentation(user, realm))
+                .collect(Collectors.toList());
     }
 
     @Override
     public List<UserModel> searchForUser(Map<String, String> params, RealmModel realm) {
+        log.info("searchForUser(Map<String, String> params, RealmModel realm) ");
+
         return new ArrayList<>();
     }
 
     @Override
     public List<UserModel> searchForUser(Map<String, String> params, RealmModel realm, int firstResult,
                                          int maxResults) {
+        log.info("searchForUser(Map<String, String> params, RealmModel realm, int firstResult,\n" +
+                "                                         int maxResults) ");
+
         return new ArrayList<>();
     }
 
@@ -149,6 +158,7 @@ public class KsaUserStorageProvider implements UserStorageProvider,
 
     @Override
     public List<UserModel> searchForUserByUserAttribute(String attrName, String attrValue, RealmModel realm) {
+        log.info("searchForUserByUserAttribute(String attrName, String attrValue, RealmModel realm)");
 
         return new ArrayList<>();
     }

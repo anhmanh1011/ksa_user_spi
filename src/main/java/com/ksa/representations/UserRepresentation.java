@@ -1,6 +1,5 @@
 package com.ksa.representations;
 
-import com.ksa.dao.UserDAO;
 import com.ksa.model.UserDto;
 import lombok.extern.jbosslog.JBossLog;
 import org.keycloak.common.util.MultivaluedHashMap;
@@ -27,15 +26,6 @@ public class UserRepresentation extends AbstractUserAdapterFederatedStorage {
                               UserDto userDto) {
         super(session, realm, storageProviderModel);
         this.userDto = userDto;
-        RoleModel user_flex = KeycloakModelUtils.getRoleFromString(realm, "user_ksa");
-        if (user_flex != null) {
-            log.info("Role user ksa exists in realm role");
-            if (!hasRole(user_flex))
-                this.grantRole(user_flex);
-        } else {
-            log.error("Role user ksa not found in realm role");
-        }
-
     }
 
     @Override
@@ -57,6 +47,7 @@ public class UserRepresentation extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public String getEmail() {
+        log.info("getEmail " + userDto.getEmail());
         return userDto.getEmail();
     }
 
@@ -81,19 +72,20 @@ public class UserRepresentation extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public void setAttribute(String name, List<String> values) {
-        if(name.equals(IS_RESET_PASSWORD)){
+        if (name.equals(IS_RESET_PASSWORD)) {
             userDto.setIsReset(values.get(0));
         }
     }
+
     public static String PHONE_ATTRIBUTE = "PHONE_ATTRIBUTE";
     public static String IS_RESET_PASSWORD = "IS_RESET_PASSWORD";
 
     @Override
     public String getFirstAttribute(String name) {
-        log.debug("getFirstAttribute: " + name);
-        if (name.equals(PHONE_ATTRIBUTE)) {
+        log.info("getFirstAttribute: " + name);
+        if (name.equalsIgnoreCase(PHONE_ATTRIBUTE)) {
             return userDto.getPhone();
-        } else if (name.equals(IS_RESET_PASSWORD)) {
+        } else if (name.equalsIgnoreCase(IS_RESET_PASSWORD)) {
             return userDto.getIsReset();
         } else {
             return super.getFirstAttribute(name);
@@ -108,7 +100,7 @@ public class UserRepresentation extends AbstractUserAdapterFederatedStorage {
         all.putAll(attrs);
         all.add(PHONE_ATTRIBUTE, userDto.getPhone());
         all.add(IS_RESET_PASSWORD, userDto.getIsReset());
-        log.debug("getAttributes: " + all);
+        log.info("getAttributes: " + all);
         return all;
     }
 
@@ -119,14 +111,14 @@ public class UserRepresentation extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public List<String> getAttribute(String name) {
-        log.debug("getAttribute: " + name);
+        log.info("getAttribute: " + name);
 
         if (name.equals(PHONE_ATTRIBUTE)) {
             return Collections.singletonList(userDto.getPhone());
         } else if (name.equals(IS_RESET_PASSWORD)) {
             return Collections.singletonList(userDto.getIsReset());
         } else {
-            return null;
+            return super.getAttribute(name);
         }
     }
 
