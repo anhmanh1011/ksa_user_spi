@@ -87,9 +87,12 @@ public class UserDAO {
 
     }
 
-    public void updateIsReset(String customerCode) {
-        Query nativeQuery = entityManager.createNativeQuery("update KSA_CUSTOMER_CREDENTIALS set IS_RESET = 0 WHERE CUSTOMER_CODE = '" + customerCode + "' ");
+    public void updateIsReset(String customerCode, int isReset) {
+        Query nativeQuery = entityManager.createNativeQuery("update KSA_CUSTOMER_CREDENTIALS set IS_RESET = :is_reset WHERE CUSTOMER_CODE = :customerCode ");
+        nativeQuery.setParameter("is_reset", isReset);
+        nativeQuery.setParameter("customerCode", customerCode);
         int i = nativeQuery.executeUpdate();
+        log.info("exec update isreset password: " + i);
     }
 
     public List<UserDto> findAll() {
@@ -147,8 +150,12 @@ public class UserDAO {
         try {
             Object[] singleResult = (Object[]) query.getSingleResult();
             return getUserDtoFromResultList(singleResult);
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (NoResultException ex) {
+            log.info("login failed");
+            return Optional.empty();
+        } catch (Exception ex){
+            log.info("login error");
+            log.error(ex);
             return Optional.empty();
         }
     }

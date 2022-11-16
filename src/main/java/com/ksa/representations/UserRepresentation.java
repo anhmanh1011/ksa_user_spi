@@ -1,5 +1,6 @@
 package com.ksa.representations;
 
+import com.ksa.dao.UserDAO;
 import com.ksa.model.UserDto;
 import lombok.extern.jbosslog.JBossLog;
 import org.keycloak.common.util.MultivaluedHashMap;
@@ -19,13 +20,15 @@ import java.util.Set;
 @JBossLog
 public class UserRepresentation extends AbstractUserAdapterFederatedStorage {
     private UserDto userDto;
+    private  UserDAO userDAO;
 
     public UserRepresentation(KeycloakSession session,
                               RealmModel realm,
-                              ComponentModel storageProviderModel,
+                              ComponentModel storageProviderModel, UserDAO userDAO,
                               UserDto userDto) {
         super(session, realm, storageProviderModel);
         this.userDto = userDto;
+        this.userDAO = userDAO;
     }
 
     @Override
@@ -53,11 +56,10 @@ public class UserRepresentation extends AbstractUserAdapterFederatedStorage {
 
     @Override
     public void setSingleAttribute(String name, String value) {
-//        if (name.equals(PHONE_ATTRIBUTE)) {
-//            userDto.setPhone(value);
-//        } else {
-//            super.setSingleAttribute(name, value);
-//        }
+        if (name.equals(IS_RESET_PASSWORD)) {
+            userDto.setIsReset(value);
+//            userDAO.updateIsReset(userDto.getCustomerCode(), Integer.parseInt(value));
+        }
     }
 
     @Override

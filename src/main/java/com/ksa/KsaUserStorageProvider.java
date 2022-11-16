@@ -173,7 +173,7 @@ public class KsaUserStorageProvider implements UserStorageProvider,
     }
 
     public UserRepresentation getUserRepresentation(UserDto user, RealmModel realm) {
-        return new UserRepresentation(session, realm, model, user);
+        return new UserRepresentation(session, realm, model,userDAO, user);
     }
 
     @Override
