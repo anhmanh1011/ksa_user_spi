@@ -143,7 +143,7 @@ public class UserDAO {
             sql.append("    and KC.customerCode = :username ");
         } else if (matcherEmail.find()) {
             sql.append("    and KC.email = :username ");
-        }
+        } else return Optional.empty();
         Query query = entityManager.createQuery(sql.toString());
 
         query.setParameter("username", username);
